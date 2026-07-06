@@ -80,8 +80,10 @@ async function checkOnce() {
       console.log('заявка на оплату:', from, '| курс:', parsed.course, '| в базе:', saved);
       await notify(
         `📧 Заявка на оплату от ${from}\n` +
-        `Курс: ${parsed.course || '—'}\nОрг: ${parsed.org_name || '—'}\n` +
+        `Курс: ${parsed.course || '—'}\n` +
+        `Дата: ${parsed.event_date || '—'}\nОрг: ${parsed.org_name || '—'}\n` +
         `ИНН: ${parsed.inn || '—'}  КПП: ${parsed.kpp || '—'}\n` +
+        `Адрес: ${parsed.postal_address || '—'}\n` +
         `Слушатели: ${parsed.students.join('; ') || '—'}\n` +
         `В базе: ${saved ? 'да' : 'НЕТ'} | Автоответ отправлен`
       );

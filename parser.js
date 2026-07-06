@@ -1,84 +1,87 @@
-// Разбор письма «прошу направить реквизиты для оплаты».
-// Письма пишут люди, формат гуляет, поэтому парсер терпимый:
-// значение может стоять после метки через двоеточие или на следующей строке.
+// Разбор письма-заявки «прошу направить реквизиты для оплаты».
+// Формат письма — построчный «Метка: значение» (эталон согласован с Денисом):
+//   Название курса/вебинара : …
+//   Дата проведения (только для вебинаров): …
+//   Плательщик:
+//   Название организации: …
+//   ИНН: …   КПП: …   Почтовый адрес: …
+//   Слушатель (слушатели):
+//   ФИО: …
 
 // Грубое превращение HTML-письма в плоский текст.
 function htmlToText(html) {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<(br|\/p|\/div|\/tr|\/li)[^>]*>/gi, '\n')
+    .replace(/<(br|\/p|\/div|\/tr|\/li|\/h\d)[^>]*>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
     .replace(/[ \t]+/g, ' ')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .join('\n');
+    .split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
 }
 
-const LABELS = [
-  'название курса', 'курс',
-  'плательщик', 'название орг', 'организация',
-  'инн', 'кпп', 'почтовый адрес', 'адрес',
-  'слушатель', 'слушатели', 'фио',
-];
-
-function isLabelLine(line) {
-  const l = line.toLowerCase().replace(/[:\s]+$/, '');
-  return LABELS.some((label) => l === label || l.startsWith(label + ':'));
+// Нормализуем метку: нижний регистр, убираем звёздочки, схлопываем пробелы.
+function norm(s) {
+  return String(s).toLowerCase().replace(/[*]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// Ищет значение для метки: остаток строки после метки,
-// либо следующая строка, если после метки пусто.
-// Метки перебираются по порядку аргументов: первая — самая точная,
-// поэтому «название орг» побеждает общий «плательщик».
-function valueFor(lines, ...labels) {
-  for (const label of labels) {
-    for (let i = 0; i < lines.length; i++) {
-      const low = lines[i].toLowerCase();
-      if (!low.startsWith(label)) continue;
-      const rest = lines[i].slice(label.length).replace(/^[:\s—-]+/, '').trim();
-      if (rest) return rest;
-      for (let j = i + 1; j < lines.length; j++) {
-        if (!isLabelLine(lines[j])) return lines[j];
-      }
-    }
-  }
-  return null;
+// Значение считается пустым, если это прочерк/заполнитель.
+function cleanVal(v) {
+  v = String(v || '').trim();
+  if (!v) return null;
+  if (/^[_\s.·—–-]+$/.test(v)) return null; // «__________» и подобное
+  return v;
 }
 
-// ФИО: 2–4 слова с заглавной буквы кириллицей, допускаем дефисы.
-const FIO_RE = /^[А-ЯЁ][а-яё-]+(?: [А-ЯЁ][а-яё.-]+){1,3}$/;
+// Разбиваем письмо на пары «метка → значение» по первому двоеточию в строке.
+function toPairs(text) {
+  return text.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
+    const i = line.indexOf(':');
+    if (i > 0) return { label: norm(line.slice(0, i)), value: line.slice(i + 1).trim() };
+    return { label: null, value: line };
+  });
+}
 
-function extractStudents(lines) {
-  const start = lines.findIndex((l) => /^(слушател|фио)/i.test(l));
-  if (start === -1) return [];
-  const students = [];
-  for (let i = start; i < lines.length; i++) {
-    const line = lines[i].replace(/^(фио|слушател[а-яё]*)(\s+слушател[а-яё]*)?[:\s—-]*/i, '').trim();
-    if (line && FIO_RE.test(line)) students.push(line);
-  }
-  return students;
+// Несколько ФИО в одной строке — через ; или запятую перед новым именем.
+function splitNames(v) {
+  return String(v || '').split(/[;\n]|,(?=\s*[А-ЯЁ])/).map((s) => s.trim()).filter((s) => cleanVal(s));
 }
 
 function parsePaymentRequest(text) {
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  const inn = (text.match(/инн[:\s]*(\d{10}(?:\d{2})?)(?!\d)/i) || [])[1] || null;
-  const kpp = (text.match(/кпп[:\s]*(\d{9})(?!\d)/i) || [])[1] || null;
-  // Если организацию написали одной строкой с ИНН/КПП — отрезаем хвост.
-  let org = valueFor(lines, 'название орг', 'организация', 'плательщик');
-  if (org) org = org.split(/,?\s*(?:инн|кпп)[\s:]/i)[0].trim() || org;
+  const pairs = toPairs(text);
+  // берём значение по первой подходящей метке из списка (по приоритету)
+  const val = (...res) => {
+    for (const re of res) {
+      const p = pairs.find((x) => x.label && re.test(x.label));
+      if (p) { const v = cleanVal(p.value); if (v) return v; }
+    }
+    return null;
+  };
+
+  // ИНН/КПП — из своей метки, иначе поиск по всему тексту
+  let inn = val(/^инн/);
+  if (!inn || !/^\d{10,12}$/.test(inn.replace(/\s/g, ''))) {
+    const m = text.match(/инн[:\s]*?(\d{10}(?:\d{2})?)(?!\d)/i);
+    inn = m ? m[1] : (inn && inn.replace(/\s/g, '')) || null;
+  }
+  let kpp = val(/^кпп/);
+  if (!kpp || !/^\d{9}$/.test(kpp.replace(/\s/g, ''))) {
+    const m = text.match(/кпп[:\s]*?(\d{9})(?!\d)/i);
+    kpp = m ? m[1] : (kpp && kpp.replace(/\s/g, '')) || null;
+  }
+
+  const students = pairs
+    .filter((p) => p.label && /^фио/.test(p.label))
+    .flatMap((p) => splitNames(p.value));
+
   return {
-    course: valueFor(lines, 'название курса', 'курс'),
-    org_name: org,
-    inn,
-    kpp,
-    postal_address: valueFor(lines, 'почтовый адрес', 'адрес'),
-    students: extractStudents(lines),
+    course: val(/^название курса/, /^курс/, /^вебинар/),
+    event_date: val(/^дата проведения/),
+    org_name: val(/^название организаци/, /^организаци/, /^плательщик/),
+    inn: inn || null,
+    kpp: kpp || null,
+    postal_address: val(/^почтовый адрес/, /^адрес/),
+    students,
   };
 }
 

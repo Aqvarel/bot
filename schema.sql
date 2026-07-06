@@ -6,7 +6,8 @@ create table if not exists payment_requests (
   received_at timestamptz,          -- когда пришло письмо
   from_email text,
   subject text,
-  course text,                      -- название курса
+  course text,                      -- название курса/вебинара
+  event_date text,                  -- дата проведения (только для вебинаров)
   org_name text,                    -- плательщик: название организации
   inn text,
   kpp text,
