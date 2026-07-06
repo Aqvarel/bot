@@ -1,0 +1,7 @@
+# секреты и рабочее состояние — никогда не коммитить
+token.json
+device.json
+supabase.json
+state.json
+notifications.log
+node_modules/

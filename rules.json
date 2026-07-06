@@ -1,0 +1,10 @@
+{
+  "settings": {
+    "poll_seconds": 120,
+    "reply_cooldown_hours": 24,
+    "skip_senders": ["no-reply", "noreply", "donotreply", "mailer-daemon", "postmaster", "@accountprotection.microsoft.com", "@id.supercell.com"]
+  },
+  "payment_request_reply": "Добрый день!\n\nВаша заявка получена. Реквизиты для оплаты и счёт направим вам в ближайшее время.\n\n(ШАБЛОН — здесь будет ваш текст)",
+  "rules": [],
+  "default_reply": null
+}
