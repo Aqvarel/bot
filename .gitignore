@@ -3,5 +3,7 @@ token.json
 device.json
 supabase.json
 state.json
+health.json
+deadletter.jsonl
 notifications.log
 node_modules/

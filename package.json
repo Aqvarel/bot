@@ -1,0 +1,14 @@
+{
+  "name": "mail-autoreply-bot",
+  "version": "2.0.0",
+  "description": "Автоответчик Outlook: заявки на оплату курса → Supabase → ответ. Слоистая архитектура, ноль внешних зависимостей.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "login": "node src/login.js",
+    "dry-run": "DRY_RUN=1 node src/index.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}
