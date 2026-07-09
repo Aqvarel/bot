@@ -76,6 +76,36 @@ class MailService {
   getBody(id) { return this.#client.get(`/me/messages/${id}?$select=body,subject,from`); }
   reply(id, comment) { return this.#client.post(`/me/messages/${id}/reply`, { comment }); }
   markRead(id) { return this.#client.patch(`/me/messages/${id}`, { isRead: true }); }
+
+  // Ответить с телом-текстом И вложением: создаём черновик-ответ (сохраняет
+  // тему/цепочку), задаём тело, прикрепляем файл, отправляем.
+  async replyWithAttachment(id, bodyText, attachment) {
+    const draft = await this.#client.post(`/me/messages/${id}/createReply`, {});
+    await this.#client.patch(`/me/messages/${draft.id}`, {
+      body: { contentType: 'text', content: bodyText },
+    });
+    await this.#client.post(`/me/messages/${draft.id}/attachments`, {
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: attachment.name,
+      contentType: attachment.contentType || 'application/octet-stream',
+      contentBytes: attachment.contentBytes, // base64
+    });
+    await this.#client.post(`/me/messages/${draft.id}/send`, null);
+  }
+
+  // id папки по имени в корне почты; создаём, если нет (кэшируется вызывающим).
+  async ensureFolder(displayName) {
+    const list = await this.#client.get(
+      `/me/mailFolders?$top=100&$select=id,displayName`);
+    const found = (list.value || []).find((f) => f.displayName === displayName);
+    if (found) return found.id;
+    const created = await this.#client.post('/me/mailFolders', { displayName });
+    return created.id;
+  }
+
+  moveToFolder(id, folderId) {
+    return this.#client.post(`/me/messages/${id}/move`, { destinationId: folderId });
+  }
 }
 
 module.exports = { GraphClient, MailService, GraphError };

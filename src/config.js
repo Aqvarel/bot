@@ -23,6 +23,15 @@ function fail(msg) {
   throw e;
 }
 
+// число из env, если задано и валидно (иначе undefined — чтобы 0 не терялся)
+function envNum(name) {
+  const v = process.env[name];
+  if (v === undefined || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+const first = (...xs) => xs.find((x) => x !== undefined && x !== null);
+
 function load() {
   // app.json — настройки поведения (совместимо со старым rules.json)
   const app = readJson(p('app.json')) || readJson(p('rules.json')) || {};
@@ -41,15 +50,20 @@ function load() {
       state: process.env.STATE_PATH ? path.resolve(process.env.STATE_PATH) : p('state.json'),
       health: p('health.json'),
       deadletter: p('deadletter.jsonl'),
+      prices: p('prices.json'),
+      template: p('reply-template.txt'),
+      attachment: p('payment-order.xls'),
     },
+    humanCheckFolder: process.env.HUMANCHECK_FOLDER || 'HumanCheck',
+    attachmentName: 'Реквизиты для оплаты.xls',
     graph: GRAPH_DEFAULTS,
     supabase: { url: sb.url.replace(/\/$/, ''), key: sb.service_role_key, table: sb.table || 'payment_requests' },
     poll: {
-      intervalMs: (Number(process.env.POLL_SECONDS) || s.poll_seconds || 120) * 1000,
-      pageSize: Number(process.env.POLL_PAGE_SIZE) || 50,
+      intervalMs: first(envNum('POLL_SECONDS'), s.poll_seconds, 120) * 1000,
+      pageSize: envNum('POLL_PAGE_SIZE') || 50,
     },
     reply: {
-      cooldownMs: (Number(process.env.REPLY_COOLDOWN_HOURS) || s.reply_cooldown_hours || 24) * 3600 * 1000,
+      cooldownMs: first(envNum('REPLY_COOLDOWN_HOURS'), s.reply_cooldown_hours, 24) * 3600 * 1000,
       template: app.payment_request_reply || 'Ваша заявка получена. Реквизиты направим в ближайшее время.',
       rules: Array.isArray(app.rules) ? app.rules : [],
       defaultReply: app.default_reply || null,
@@ -57,6 +71,7 @@ function load() {
     skipSenders: (s.skip_senders || ['no-reply', 'noreply', 'donotreply', 'mailer-daemon', 'postmaster'])
       .map((x) => String(x).toLowerCase()),
     dryRun: process.env.DRY_RUN === '1',
+    allowSelf: process.env.TEST_ALLOW_SELF === '1', // только для контролируемых тестов
     processedCap: 1000,
   };
 

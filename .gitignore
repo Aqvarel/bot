@@ -7,3 +7,6 @@ health.json
 deadletter.jsonl
 notifications.log
 node_modules/
+# операционные данные (лежат только на сервере): прайс и платёжка с реквизитами
+prices.json
+payment-order.xls

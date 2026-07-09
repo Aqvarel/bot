@@ -9,6 +9,9 @@ const { StateStore } = require('./state');
 const { PaymentRepo } = require('./supabase');
 const { MessageProcessor } = require('./processor');
 const { Poller } = require('./poller');
+const { Catalog } = require('./catalog');
+const { ReplyRenderer } = require('./render');
+const fs = require('fs');
 
 async function main() {
   const cfg = config.load(); // fail-fast: бросит понятную ошибку при плохом конфиге
@@ -30,7 +33,20 @@ async function main() {
   const selfAddress = await mail.whoAmI();
   logger.info('вход в ящик подтверждён', { mailbox: selfAddress });
 
-  const processor = new MessageProcessor({ mail, repo, state, config: cfg, logger, clock, selfAddress });
+  // каталог цен + шаблон ответа + вложение-платёжка (грузим один раз)
+  const catalog = new Catalog({ pricesPath: cfg.paths.prices });
+  const renderer = new ReplyRenderer({ templatePath: cfg.paths.template });
+  const attachment = {
+    name: cfg.attachmentName,
+    contentType: 'application/vnd.ms-excel',
+    contentBytes: fs.readFileSync(cfg.paths.attachment).toString('base64'),
+  };
+  logger.info('каталог и вложение загружены', { courses: catalog.size });
+
+  const processor = new MessageProcessor({
+    mail, repo, state, config: cfg, logger, clock, selfAddress,
+    catalog, renderer, attachment, humanCheckFolder: cfg.humanCheckFolder,
+  });
   const poller = new Poller({ mail, state, processor, config: cfg, logger, clock });
 
   // корректное завершение: дать текущему циклу закончиться и сохранить состояние
