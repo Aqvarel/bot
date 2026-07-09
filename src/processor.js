@@ -62,41 +62,43 @@ class MessageProcessor {
 
   async #handlePayment(id, msg, from, text, log) {
     const parsed = parsePaymentRequest(text);
-    const item = this.#catalog.lookup(parsed.course); // точное совпадение или null
+    const { items, complete } = this.#catalog.match(parsed.course); // 1+ курсов или пусто
 
-    // Название не сошлось точно с прайсом → в HumanCheck, цену не угадываем.
-    if (!item) {
-      await this.#saveRow(parsed, from, msg, text, 'needs_review', null, log);
+    // Распознаны НЕ все курсы (или ни одного) → HumanCheck, цену не угадываем.
+    if (!complete) {
+      await this.#saveRow(parsed, from, msg, text, 'needs_review', log);
       if (this.#config.dryRun) {
-        log.info('[dry-run] нет точного совпадения → HumanCheck', { course: parsed.course });
+        log.info('[dry-run] курсы распознаны не полностью → HumanCheck', { course: parsed.course, matched: items.length });
       } else {
         await this.#moveToHumanCheck(id, log);
       }
-      log.info('заявка → HumanCheck (нет точного совпадения)', { course: parsed.course, org: parsed.org_name });
+      log.info('заявка → HumanCheck (курс не распознан)', { course: parsed.course, org: parsed.org_name });
       return Outcome.PAYMENT_HUMANCHECK;
     }
 
-    // Совпало → сохраняем, отвечаем заполненным шаблоном + платёжка вложением.
-    await this.#saveRow(parsed, from, msg, text, 'matched', item.price, log);
-    const body = this.#renderer.render(item);
+    // Все курсы совпали → сохраняем, отвечаем шаблоном (цена/суммы) + платёжка.
+    const total = items.reduce((s, it) => s + it.price, 0);
+    const courseNames = items.map((it) => it.name).join(' + ');
+    await this.#saveRow({ ...parsed, course: courseNames }, from, msg, text, 'matched', log);
+    const body = this.#renderer.render(items);
     if (this.#config.dryRun) {
-      log.info('[dry-run] ответил бы ценой + платёжкой', { course: item.name, price: item.price });
+      log.info('[dry-run] ответил бы ценой + платёжкой', { courses: courseNames, total });
     } else {
       await this.#mail.replyWithAttachment(id, body, this.#attachment);
       this.#state.recordReply(from, this.#clock.now());
     }
     log.info('заявка обработана: цена + платёжка отправлены', {
-      course: item.name, price: item.price, org: parsed.org_name,
+      courses: items.length, total, org: parsed.org_name,
       inn: parsed.inn, students: parsed.students.length, dryRun: this.#config.dryRun,
     });
     return Outcome.PAYMENT_MATCHED;
   }
 
-  async #saveRow(parsed, from, msg, text, status, price, log) {
+  async #saveRow(parsed, from, msg, text, status, log) {
     if (this.#config.dryRun) return;
     const row = {
       from_email: from, subject: msg.subject || null, received_at: msg.receivedDateTime,
-      ...parsed, raw_body: text, status, // price выводим из course по прайсу, отдельно не храним
+      ...parsed, raw_body: text, status,
     };
     try { await this.#repo.insert(row); }
     catch (e) { log.error('заявка не записана (ушла в dead-letter)', { error: e.message }); }

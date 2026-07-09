@@ -1,4 +1,6 @@
-// Формирование ответа по шаблону: подстановка цены и названия курса.
+// Формирование ответа по шаблону: подстановка цены(цен) и названия(й) курса.
+// Один курс — вывод идентичен исходному образцу. Несколько курсов — построчная
+// разбивка и суммарная стоимость для одного слушателя.
 'use strict';
 const fs = require('fs');
 
@@ -13,12 +15,17 @@ class ReplyRenderer {
   constructor({ templatePath }) {
     this.#template = fs.readFileSync(templatePath, 'utf8');
   }
-  // item = { name, price, term }
-  render(item) {
-    const price = formatPrice(item.price);
+
+  // items = [{ name, price, term }, ...] (один или несколько курсов)
+  render(items) {
+    const list = Array.isArray(items) ? items : [items];
+    const total = list.reduce((s, it) => s + it.price, 0);
+    const breakdown = list
+      .map((it) => `${it.name} стоит ${formatPrice(it.price)} руб.`)
+      .join('\n');
     return this.#template
-      .replace(/\{\{price\}\}/g, price)
-      .replace(/\{\{course\}\}/g, item.name);
+      .replace(/\{\{total\}\}/g, formatPrice(total))
+      .replace(/\{\{breakdown\}\}/g, breakdown);
   }
 }
 
