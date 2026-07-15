@@ -1,4 +1,6 @@
-// Тесты каталога цен (в т.ч. несколько курсов) и рендера ответа.
+/**
+ * @fileoverview Проверяет каталог цен и формирование ответа клиенту.
+ */
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

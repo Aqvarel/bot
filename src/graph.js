@@ -1,8 +1,10 @@
-// Шлюз Microsoft Graph: HTTP-клиент с авторизацией, ретраями и уважением к
-// троттлингу (429 Retry-After), плюс доменные операции с почтой.
+/**
+ * @fileoverview HTTP-шлюз Microsoft Graph и операции с почтовым ящиком.
+ */
 "use strict";
 const { withRetry } = require("./util");
 
+/** Ошибка HTTP-операции Microsoft Graph. */
 class GraphError extends Error {
   constructor(message, status, retryAfterMs) {
     super(message);
@@ -16,6 +18,7 @@ class GraphError extends Error {
 const isTransient = (err) =>
   !err.status || err.status === 429 || (err.status >= 500 && err.status < 600);
 
+/** Авторизованный HTTP-клиент Microsoft Graph. */
 class GraphClient {
   #auth;
   #baseUrl;
@@ -26,6 +29,14 @@ class GraphClient {
     this.#logger = logger;
   }
 
+  /**
+   * Выполняет запрос Graph с таймаутом и безопасной политикой повторов.
+   * @param {string} method HTTP-метод.
+   * @param {string} urlOrPath Абсолютный URL или путь Graph API.
+   * @param {*=} body JSON-тело запроса.
+   * @return {!Promise<*>} Разобранный JSON или `null` для пустого ответа.
+   * @throws {!GraphError} Graph вернул неуспешный HTTP-статус.
+   */
   async request(method, urlOrPath, body) {
     const url = urlOrPath.startsWith("http")
       ? urlOrPath
@@ -81,12 +92,17 @@ class GraphClient {
   }
 }
 
+/** Высокоуровневые операции с сообщениями и папками Outlook. */
 class MailService {
   #client;
   constructor({ client }) {
     this.#client = client;
   }
 
+  /**
+   * Возвращает нормализованный адрес авторизованного ящика.
+   * @return {!Promise<string>} Email текущего пользователя.
+   */
   async whoAmI() {
     const me = await this.#client.get("/me");
     return (me.userPrincipalName || me.mail || "").toLowerCase();
@@ -94,6 +110,12 @@ class MailService {
 
   // Все письма, пришедшие начиная с isoTime (включительно), по возрастанию —
   // независимо от статуса прочтения. Это чинит баг «письмо открыли раньше бота».
+  /**
+   * Загружает все письма не старше указанного времени с пагинацией.
+   * @param {string} isoTime Нижняя временная граница в ISO 8601.
+   * @param {number=} pageSize Размер страницы Graph.
+   * @return {!Promise<!Array<!Object>>} Сообщения по возрастанию времени.
+   */
   async fetchSince(isoTime, pageSize = 50) {
     const params = new URLSearchParams({
       $filter: `receivedDateTime ge ${isoTime}`,
@@ -114,6 +136,11 @@ class MailService {
   getBody(id) {
     return this.#client.get(`/me/messages/${id}?$select=body,subject,from`);
   }
+  /**
+   * Возвращает метаданные всех вложений сообщения.
+   * @param {string} id ID сообщения Graph.
+   * @return {!Promise<!Array<!Object>>} Метаданные вложений.
+   */
   async listAttachments(id) {
     const data = await this.#client.get(
       `/me/messages/${id}/attachments?$select=id,name,contentType,size,isInline`,
@@ -134,6 +161,13 @@ class MailService {
 
   // Ответить с телом-текстом И вложением: создаём черновик-ответ (сохраняет
   // тему/цепочку), задаём тело, прикрепляем файл, отправляем.
+  /**
+   * Отправляет ответ с текстом и одним файловым вложением.
+   * @param {string} id ID исходного сообщения.
+   * @param {string} bodyText Текст ответа.
+   * @param {!Object} attachment Имя, MIME и содержимое base64.
+   * @return {!Promise<void>}
+   */
   async replyWithAttachment(id, bodyText, attachment) {
     const draft = await this.#client.post(`/me/messages/${id}/createReply`, {});
     await this.#client.patch(`/me/messages/${draft.id}`, {
@@ -149,6 +183,11 @@ class MailService {
   }
 
   // id папки по имени в корне почты; создаём, если нет (кэшируется вызывающим).
+  /**
+   * Находит корневую папку по имени или создаёт её.
+   * @param {string} displayName Отображаемое имя папки.
+   * @return {!Promise<string>} ID папки Graph.
+   */
   async ensureFolder(displayName) {
     const list = await this.#client.get(
       `/me/mailFolders?$top=100&$select=id,displayName`,

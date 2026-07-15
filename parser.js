@@ -1,4 +1,7 @@
-// Разбор письма-заявки «прошу направить реквизиты для оплаты».
+/**
+ * @fileoverview Распознаёт и разбирает текст заявки на оплату курса.
+ */
+// Формат письма-заявки «прошу направить реквизиты для оплаты».
 // Формат письма — построчный «Метка: значение» (эталон согласован с Денисом):
 //   Название курса/вебинара : …
 //   Дата проведения (только для вебинаров): …
@@ -9,6 +12,11 @@
 //   ФИО: …
 
 // Грубое превращение HTML-письма в плоский текст.
+/**
+ * Преобразует ограниченный HTML письма в плоский текст.
+ * @param {string} html HTML-содержимое сообщения.
+ * @return {string} Текст с сохранёнными смысловыми переносами строк.
+ */
 function htmlToText(html) {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -68,6 +76,13 @@ function splitNames(v) {
     .filter((s) => cleanVal(s));
 }
 
+/**
+ * Разбирает поля заявки из нормализованного текста.
+ * @param {string} text Текст письма или документа.
+ * @return {{course: ?string, event_date: ?string, org_name: ?string,
+ *   inn: ?string, kpp: ?string, postal_address: ?string,
+ *   students: !Array<string>}} Данные заявки.
+ */
 function parsePaymentRequest(text) {
   const pairs = toPairs(text);
   // берём значение по первой подходящей метке из списка (по приоритету)
@@ -110,6 +125,11 @@ function parsePaymentRequest(text) {
 }
 
 // Письмо похоже на заявку, если просят реквизиты/счёт или есть ИНН.
+/**
+ * Определяет, содержит ли текст характерные признаки заявки на оплату.
+ * @param {string} text Проверяемый текст.
+ * @return {boolean} `true`, если текст похож на заявку.
+ */
 function looksLikePaymentRequest(text) {
   const low = text.toLowerCase();
   return (

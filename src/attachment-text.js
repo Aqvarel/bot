@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Проверяет вложения заявок и извлекает текст из PDF/DOCX.
+ */
 'use strict';
 
 const path = require('path');
@@ -17,14 +20,30 @@ function withParseTimeout(promise, name) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+/**
+ * Возвращает нормализованное расширение имени файла.
+ * @param {?string} name Имя файла.
+ * @return {string} Расширение в нижнем регистре с ведущей точкой.
+ */
 function extensionOf(name) {
   return path.extname(String(name || '')).toLowerCase();
 }
 
+/**
+ * Проверяет, является ли вложение поддерживаемым пользовательским документом.
+ * @param {?Object} attachment Метаданные вложения Microsoft Graph.
+ * @return {boolean} `true` для невстроенного PDF или DOCX.
+ */
 function isSupportedAttachment(attachment) {
   return attachment && attachment.isInline !== true && SUPPORTED_EXTENSIONS.has(extensionOf(attachment.name));
 }
 
+/**
+ * Извлекает текст из PDF или DOCX с проверкой размера и сигнатуры.
+ * @param {!Object} attachment Вложение с `name` и base64-полем `contentBytes`.
+ * @return {!Promise<string>} Извлечённый нормализованный текст.
+ * @throws {!Error} Файл пуст, слишком велик, повреждён или не поддерживается.
+ */
 async function extractAttachmentText(attachment) {
   const ext = extensionOf(attachment.name);
   const buffer = Buffer.from(attachment.contentBytes || '', 'base64');

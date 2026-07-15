@@ -1,4 +1,7 @@
-// Юнит-тесты разбора заявок — встроенный node:test, без зависимостей.
+/**
+ * @fileoverview Проверяет распознавание и разбор текстовых заявок.
+ */
+// Встроенный node:test, без test framework зависимостей.
 //   node --test
 'use strict';
 const { test } = require('node:test');

@@ -1,4 +1,6 @@
-// Каталог курсов: поиск цены по названию из заявки.
+/**
+ * @fileoverview Загружает каталог курсов и сопоставляет названия из заявки.
+ */
 // Совпадение ТОЧНОЕ, но устойчивое к косметике: регистр, лишние пробелы,
 // кавычки, ё→е, пунктуация. Поддерживает НЕСКОЛЬКО курсов в одной заявке
 // (через «и» / запятую) — но так, что названия, сами содержащие «и»/запятую,
@@ -6,6 +8,11 @@
 'use strict';
 const fs = require('fs');
 
+/**
+ * Нормализует название курса для устойчивого точного сравнения.
+ * @param {?string} s Исходное название.
+ * @return {string} Нормализованное название.
+ */
 function normName(s) {
   return String(s || '')
     .toLowerCase()
@@ -28,11 +35,17 @@ function findToken(hay, needle) {
   return -1;
 }
 
+/** Каталог известных курсов и цен. */
 class Catalog {
   #byName = new Map();
   #items = [];
   #desc = []; // {key, item}, отсортированы по длине названия по убыванию
 
+  /**
+   * Создаёт каталог из JSON-файла.
+   * @param {{pricesPath: string}} options Путь к массиву записей каталога.
+   * @throws {!Error} Файл отсутствует или содержит некорректный JSON.
+   */
   constructor({ pricesPath }) {
     this.#items = JSON.parse(fs.readFileSync(pricesPath, 'utf8'));
     for (const it of this.#items) {
@@ -47,6 +60,11 @@ class Catalog {
   get size() { return this.#items.length; }
 
   // Один курс: точное (после нормализации) совпадение или null.
+  /**
+   * Ищет один курс по нормализованному точному названию.
+   * @param {?string} courseName Название из заявки.
+   * @return {?Object} Запись каталога или `null`.
+   */
   lookup(courseName) {
     if (!courseName) return null;
     return this.#byName.get(normName(courseName)) || null;
@@ -56,6 +74,11 @@ class Catalog {
   // Возвращает { items, complete }: complete=true, если РАСПОЗНАНЫ ВСЕ курсы
   // (остаток — только разделители «и»/пробелы). Если остался нераспознанный
   // текст — complete=false (заявку в HumanCheck, не угадываем).
+  /**
+   * Сопоставляет один или несколько курсов без частичного угадывания.
+   * @param {?string} courseText Текст поля с курсами.
+   * @return {{items: !Array<!Object>, complete: boolean}} Результат поиска.
+   */
   match(courseText) {
     if (!courseText) return { items: [], complete: false };
     let rem = ' ' + normName(courseText) + ' ';

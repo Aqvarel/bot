@@ -1,8 +1,12 @@
-// Поллер: цикл «забрать новые письма → обработать → продвинуть high-water →
+/**
+ * @fileoverview Последовательно опрашивает ящик и сохраняет cursor обработки.
+ */
+// Цикл «забрать новые письма → обработать → продвинуть high-water →
 // сохранить состояние → health → пауза». Поддерживает мягкую остановку.
 'use strict';
 const { sleep } = require('./util');
 
+/** Управляет жизненным циклом непрерывного опроса почты. */
 class Poller {
   #mail; #state; #processor; #config; #logger; #clock;
   #running = false; #wake = null;
@@ -12,6 +16,10 @@ class Poller {
     this.#config = config; this.#logger = logger; this.#clock = clock;
   }
 
+  /**
+   * Запускает poll loop до вызова `stop`.
+   * @return {!Promise<void>}
+   */
   async start() {
     this.#running = true;
     // первый запуск: начинаем с текущего момента, чтобы не отвечать на весь архив
@@ -61,6 +69,7 @@ class Poller {
     } catch { /* health не критичен */ }
   }
 
+  /** Запрашивает мягкую остановку и прерывает текущую паузу. */
   stop() { this.#running = false; if (this.#wake) this.#wake(); }
 
   // прерываемая пауза: stop() будит немедленно, не дожидаясь конца интервала

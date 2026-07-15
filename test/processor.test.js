@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Проверяет критические сценарии обработки одного сообщения.
+ */
 'use strict';
 
 const { test } = require('node:test');

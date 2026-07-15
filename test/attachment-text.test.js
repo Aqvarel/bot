@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Проверяет фильтрацию и базовую валидацию вложений.
+ */
 'use strict';
 
 const { test } = require('node:test');

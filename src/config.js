@@ -1,6 +1,6 @@
-// Загрузка и ВАЛИДАЦИЯ конфигурации при старте (fail-fast): если чего-то
-// не хватает — падаем сразу с понятной ошибкой, а не посреди работы.
-// Источники: app.json (настройки), supabase.json (секрет), env (переопределения).
+/**
+ * @fileoverview Загружает и fail-fast валидирует конфигурацию приложения.
+ */
 'use strict';
 const path = require('path');
 const { readJson } = require('./util');
@@ -32,6 +32,11 @@ function envNum(name) {
 }
 const first = (...xs) => xs.find((x) => x !== undefined && x !== null);
 
+/**
+ * Загружает конфигурацию из JSON-файлов и переменных окружения.
+ * @return {!Object} Полная нормализованная конфигурация приложения.
+ * @throws {!Error} Обязательные параметры отсутствуют или некорректны.
+ */
 function load() {
   // app.json — настройки поведения (совместимо со старым rules.json)
   const app = readJson(p('app.json')) || readJson(p('rules.json')) || {};

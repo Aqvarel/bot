@@ -1,4 +1,7 @@
-// Репозиторий заявок в Supabase (PostgREST) с ретраями. Если база недоступна
+/**
+ * @fileoverview Идемпотентно сохраняет заявки через Supabase PostgREST.
+ */
+// Если база недоступна
 // после всех повторов — заявка не теряется, а падает в dead-letter журнал,
 // чтобы её можно было доотправить руками.
 'use strict';
@@ -6,6 +9,7 @@ const { withRetry, appendLine } = require('./util');
 
 const isTransient = (err) => !err.status || (err.status >= 500 && err.status < 600) || err.status === 429;
 
+/** Репозиторий платёжных заявок с retry и dead-letter журналом. */
 class PaymentRepo {
   #url; #key; #table; #deadletter; #logger;
 
@@ -14,6 +18,12 @@ class PaymentRepo {
     this.#deadletter = deadletterPath; this.#logger = logger;
   }
 
+  /**
+   * Идемпотентно вставляет заявку и журналирует окончательный сбой.
+   * @param {!Object} row Строка `payment_requests` с `source_message_id`.
+   * @return {!Promise<?Object>} Созданная строка или `null` для дубликата.
+   * @throws {!Error} Supabase недоступен или отклонил запрос.
+   */
   async insert(row) {
     try {
       return await withRetry(() => this.#post(row), {

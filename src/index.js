@@ -1,4 +1,7 @@
-// Точка входа (composition root): собирает граф зависимостей, определяет
+/**
+ * @fileoverview Собирает зависимости и запускает почтовый worker.
+ */
+// Composition root: собирает граф зависимостей, определяет
 // адрес ящика, запускает поллер и корректно завершается по SIGTERM/SIGINT.
 'use strict';
 const config = require('./config');
@@ -13,6 +16,10 @@ const { Catalog } = require('./catalog');
 const { ReplyRenderer } = require('./render');
 const fs = require('fs');
 
+/**
+ * Собирает приложение, проверяет доступ к ящику и запускает poller.
+ * @return {!Promise<void>}
+ */
 async function main() {
   const cfg = config.load(); // fail-fast: бросит понятную ошибку при плохом конфиге
   const logger = createLogger();

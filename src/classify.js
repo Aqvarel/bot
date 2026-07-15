@@ -1,9 +1,17 @@
-// Доменная логика классификации письма: подходит ли под правило из конфига.
-// Разбор заявок и детектор живут в проверенном ../parser.js (переиспользуем
+/**
+ * @fileoverview Сопоставляет письмо с декларативными правилами автоответа.
+ */
 const norm = (s) => String(s || "").toLowerCase();
 
 // Правило срабатывает, если каждая заданная группа условий (отправитель/тема/
 // текст) содержит хотя бы одно из своих слов.
+/**
+ * Возвращает первое правило, все заданные группы которого совпали.
+ * @param {!Array<!Object>} rules Правила из конфигурации.
+ * @param {!Object} msg Метаданные сообщения Microsoft Graph.
+ * @param {string} bodyText Полный текст сообщения.
+ * @return {?Object} Совпавшее правило или `null`.
+ */
 function matchRule(rules, msg, bodyText) {
   const from = norm(
     msg.from && msg.from.emailAddress && msg.from.emailAddress.address,

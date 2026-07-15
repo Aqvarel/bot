@@ -1,12 +1,15 @@
-// Аутентификация в Microsoft: хранение токенов, автообновление по refresh_token
-// и device code flow для первичного входа. Возвращает всегда действующий токен.
+/**
+ * @fileoverview Управляет OAuth-токенами Microsoft и device-code входом.
+ */
 'use strict';
 const { readJson, atomicWrite, sleep } = require('./util');
 
+/** Ошибка, требующая интерактивной повторной авторизации. */
 class ReauthRequiredError extends Error {
   constructor(message) { super(message); this.name = 'ReauthRequiredError'; this.code = 'REAUTH'; }
 }
 
+/** Предоставляет действующий access token и single-flight обновление. */
 class Authenticator {
   #tokenPath; #clientId; #tenant; #scope; #logger; #refreshing = null;
 
@@ -29,6 +32,11 @@ class Authenticator {
 
   // Действующий access_token; при близком истечении — обновляем. Параллельные
   // вызовы делят один запрос обновления (single-flight), чтобы не гонять refresh.
+  /**
+   * Возвращает действующий access token, при необходимости обновляя его.
+   * @return {!Promise<string>} OAuth access token.
+   * @throws {!ReauthRequiredError} Refresh token отсутствует или отозван.
+   */
   async getAccessToken() {
     const tok = this.#read();
     if (!tok || !tok.refresh_token) {
@@ -61,6 +69,10 @@ class Authenticator {
   }
 
   // --- device code flow (первичный вход) ---
+  /**
+   * Запрашивает код для интерактивного device-code входа.
+   * @return {!Promise<!Object>} Ответ Microsoft с кодом и сроком действия.
+   */
   async requestDeviceCode() {
     const res = await fetch(`${this.#tenant}/oauth2/v2.0/devicecode`, {
       method: 'POST', signal: AbortSignal.timeout(30_000),
@@ -72,6 +84,12 @@ class Authenticator {
     return data;
   }
 
+  /**
+   * Ожидает подтверждения device-code входа и сохраняет полученные токены.
+   * @param {!Object} device Ответ `requestDeviceCode`.
+   * @return {!Promise<!Object>} Ответ token endpoint.
+   * @throws {!Error} Код истёк или Microsoft отклонил авторизацию.
+   */
   async pollForToken(device) {
     const deadline = Date.now() + device.expires_in * 1000;
     while (Date.now() < deadline) {

@@ -1,4 +1,7 @@
-// Структурный логгер с уровнями и контекстом. Формат управляется LOG_FORMAT
+/**
+ * @fileoverview Создаёт структурный logger в JSON или человекочитаемом формате.
+ */
+// Формат управляется LOG_FORMAT
 // (pretty|json) и LOG_LEVEL (debug|info|warn|error). child() привязывает
 // постоянные поля (например, id письма) ко всем последующим записям.
 'use strict';
@@ -7,6 +10,11 @@ const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
 const COLORS = { debug: '\x1b[90m', info: '\x1b[36m', warn: '\x1b[33m', error: '\x1b[31m' };
 const RESET = '\x1b[0m';
 
+/**
+ * Создаёт logger с фиксированным контекстом и минимальным уровнем.
+ * @param {!Object=} opts Уровень, формат и базовые поля.
+ * @return {!Object} Методы `debug`, `info`, `warn`, `error` и `child`.
+ */
 function createLogger(opts = {}) {
   const level = opts.level || process.env.LOG_LEVEL || 'info';
   const format = opts.format || process.env.LOG_FORMAT || 'pretty';

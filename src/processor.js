@@ -1,4 +1,7 @@
-// Обработчик одного письма (use-case). Все зависимости внедряются — модуль
+/**
+ * @fileoverview Оркестрирует классификацию и обработку одного письма.
+ */
+// Все зависимости внедряются — модуль
 // чистый и тестируемый. Решает: пропустить / ответить по правилу / это заявка
 // на оплату (разобрать → записать → ответить). Идемпотентен и антиспамен.
 'use strict';
@@ -15,6 +18,7 @@ const Outcome = {
   PAYMENT_MATCHED: 'payment_matched', PAYMENT_HUMANCHECK: 'payment_humancheck',
 };
 
+/** Обрабатывает сообщение, сохраняя заявку и отправляя нужный ответ. */
 class MessageProcessor {
   #mail; #repo; #state; #config; #logger; #clock; #self;
   #catalog; #renderer; #attachment; #humanCheckFolder;
@@ -28,6 +32,12 @@ class MessageProcessor {
     this.#attachment = attachment; this.#humanCheckFolder = humanCheckFolder || 'HumanCheck';
   }
 
+  /**
+   * Обрабатывает одно сообщение идемпотентно относительно текущего state.
+   * @param {!Object} msg Метаданные сообщения Microsoft Graph.
+   * @return {!Promise<string>} Одно из значений `Outcome`.
+   * @throws {!Error} Критическая ошибка Graph или отправки ответа.
+   */
   async process(msg) {
     const id = msg.id;
     if (this.#state.isProcessed(id)) return Outcome.DUP;

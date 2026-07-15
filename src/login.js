@@ -1,4 +1,6 @@
-// Первичный вход в Microsoft-аккаунт (device code flow).
+/**
+ * @fileoverview Выполняет первичный device-code вход в Microsoft.
+ */
 //   node src/login.js
 // Показывает код и ссылку, ждёт подтверждения и сохраняет токены.
 'use strict';
@@ -7,6 +9,10 @@ const { createLogger } = require('./logger');
 const { Authenticator } = require('./auth');
 const { GraphClient, MailService } = require('./graph');
 
+/**
+ * Запрашивает device code, ожидает пользователя и проверяет текущий ящик.
+ * @return {!Promise<void>}
+ */
 async function main() {
   const cfg = config.load();
   const logger = createLogger({ format: 'pretty' });
