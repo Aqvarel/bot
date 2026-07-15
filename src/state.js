@@ -5,11 +5,12 @@
 const { readJson, atomicWrite } = require('./util');
 
 class StateStore {
-  #path; #cap; #state;
+  #path; #cap; #state; #persist;
 
-  constructor({ path, cap = 1000 }) {
+  constructor({ path, cap = 1000, persist = true }) {
     this.#path = path;
     this.#cap = cap;
+    this.#persist = persist;
     const s = readJson(path) || {};
     this.#state = {
       highWater: s.highWater || s.high_water || null, // ISO-время
@@ -38,6 +39,7 @@ class StateStore {
   recordReply(sender, now) { this.#state.lastReplyTo[sender] = now; }
 
   async save() {
+    if (!this.#persist) return;
     atomicWrite(this.#path, JSON.stringify(this.#state, null, 2));
   }
 }

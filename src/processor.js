@@ -4,6 +4,9 @@
 'use strict';
 const { htmlToText, parsePaymentRequest, looksLikePaymentRequest } = require('../parser');
 const { matchRule } = require('./classify');
+const {
+  MAX_ATTACHMENT_BYTES, isSupportedAttachment, extractAttachmentText,
+} = require('./attachment-text');
 
 // возможные исходы обработки — для метрик и логов
 const Outcome = {
@@ -38,18 +41,27 @@ class MessageProcessor {
       log.debug('пропуск: рассылка/уведомление');
       return this.#done(id, Outcome.SKIP_SENDER);
     }
-    // антиспам: одному отправителю не чаще кулдауна
-    if (!this.#state.canReply(from, this.#config.reply.cooldownMs, this.#clock.now())) {
-      log.debug('пропуск: недавно уже отвечали');
-      return this.#done(id, Outcome.COOLDOWN);
-    }
-
     // полный текст (bodyPreview обрезан — там нет ИНН/списка слушателей)
     const full = await this.#mail.getBody(id);
     const text = full.body.contentType === 'html' ? htmlToText(full.body.content) : full.body.content;
 
+    const application = await this.#readAttachedApplication(id, log);
+    if (application) {
+      return this.#done(id, await this.#handlePayment(
+        id, msg, from, application.text, log, application.name,
+      ));
+    }
+
+    // Заявка может быть заполнена прямо в тексте письма, без вложения.
     if (looksLikePaymentRequest(text)) {
-      return this.#done(id, await this.#handlePayment(id, msg, from, text, log));
+      return this.#done(id, await this.#handlePayment(id, msg, from, text, log, null));
+    }
+
+    // Кулдаун применяется только к общим автоответам. Реальные заявки всегда
+    // регистрируются, даже если отправитель прислал несколько подряд.
+    if (!this.#state.canReply(from, this.#config.reply.cooldownMs, this.#clock.now())) {
+      log.debug('пропуск автоответа: недавно уже отвечали');
+      return this.#done(id, Outcome.COOLDOWN);
     }
 
     const rule = matchRule(this.#config.reply.rules, msg, text);
@@ -60,7 +72,28 @@ class MessageProcessor {
     return this.#done(id, Outcome.RULE_REPLY);
   }
 
-  async #handlePayment(id, msg, from, text, log) {
+  async #readAttachedApplication(id, log) {
+    const attachments = await this.#mail.listAttachments(id);
+    const supported = attachments.filter(isSupportedAttachment);
+    if (!supported.length) return null;
+
+    for (const meta of supported) {
+      try {
+        if (Number(meta.size) > MAX_ATTACHMENT_BYTES) {
+          throw new Error(`вложение ${meta.name} больше 10 МБ`);
+        }
+        const attachment = await this.#mail.getAttachment(id, meta.id);
+        const text = await extractAttachmentText(attachment);
+        if (looksLikePaymentRequest(text)) return { name: meta.name, text };
+        log.warn('вложение не соответствует шаблону заявки', { attachment: meta.name });
+      } catch (e) {
+        log.error('не удалось прочитать вложение', { attachment: meta.name, error: e.message });
+      }
+    }
+    return null;
+  }
+
+  async #handlePayment(id, msg, from, text, log, attachmentName) {
     const parsed = parsePaymentRequest(text);
     const { items, complete } = this.#catalog.match(parsed.course); // 1+ курсов или пусто
 
@@ -97,6 +130,7 @@ class MessageProcessor {
   async #saveRow(parsed, from, msg, text, status, log) {
     if (this.#config.dryRun) return;
     const row = {
+      source_message_id: msg.id,
       from_email: from, subject: msg.subject || null, received_at: msg.receivedDateTime,
       ...parsed, raw_body: text, status,
     };

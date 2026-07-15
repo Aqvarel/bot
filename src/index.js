@@ -28,7 +28,10 @@ async function main() {
     url: cfg.supabase.url, key: cfg.supabase.key, table: cfg.supabase.table,
     deadletterPath: cfg.paths.deadletter, logger,
   });
-  const state = new StateStore({ path: cfg.paths.state, cap: cfg.processedCap });
+  // dry-run меняет состояние только в памяти и не может «съесть» рабочие письма.
+  const state = new StateStore({
+    path: cfg.paths.state, cap: cfg.processedCap, persist: !cfg.dryRun,
+  });
 
   const selfAddress = await mail.whoAmI();
   logger.info('вход в ящик подтверждён', { mailbox: selfAddress });

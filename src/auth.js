@@ -42,6 +42,7 @@ class Authenticator {
   async #refresh(tok) {
     const res = await fetch(`${this.#tenant}/oauth2/v2.0/token`, {
       method: 'POST',
+      signal: AbortSignal.timeout(30_000),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         client_id: this.#clientId, grant_type: 'refresh_token',
@@ -62,7 +63,8 @@ class Authenticator {
   // --- device code flow (первичный вход) ---
   async requestDeviceCode() {
     const res = await fetch(`${this.#tenant}/oauth2/v2.0/devicecode`, {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      method: 'POST', signal: AbortSignal.timeout(30_000),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: this.#clientId, scope: this.#scope }),
     });
     const data = await res.json();
@@ -75,7 +77,8 @@ class Authenticator {
     while (Date.now() < deadline) {
       await sleep((device.interval || 5) * 1000);
       const res = await fetch(`${this.#tenant}/oauth2/v2.0/token`, {
-        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        method: 'POST', signal: AbortSignal.timeout(30_000),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           client_id: this.#clientId,
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code',

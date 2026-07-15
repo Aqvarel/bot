@@ -44,8 +44,10 @@ class Poller {
       const outcome = await this.#processor.process(m);
       counts[outcome] = (counts[outcome] || 0) + 1;
       this.#state.setHighWater(m.receivedDateTime); // продвигаем отметку времени
+      // Сужаем окно повторной обработки при аварии: фиксируем каждое письмо,
+      // а не ждём завершения всей пачки.
+      await this.#state.save();
     }
-    await this.#state.save();
     this.#writeHealth({ ok: true, fetched: messages.length, counts });
     if (messages.length) this.#logger.info('цикл завершён', { fetched: messages.length, ...counts });
     else this.#logger.debug('цикл: новых писем нет');

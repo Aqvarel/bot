@@ -29,11 +29,14 @@ class PaymentRepo {
   }
 
   async #post(row) {
-    const res = await fetch(`${this.#url}/rest/v1/${this.#table}`, {
+    const endpoint = `${this.#url}/rest/v1/${this.#table}?on_conflict=source_message_id`;
+    const res = await fetch(endpoint, {
       method: 'POST',
+      signal: AbortSignal.timeout(30_000),
       headers: {
         apikey: this.#key, Authorization: `Bearer ${this.#key}`,
-        'Content-Type': 'application/json', Prefer: 'return=representation',
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=ignore-duplicates,return=representation',
       },
       body: JSON.stringify(row),
     });
@@ -42,7 +45,7 @@ class PaymentRepo {
       const e = new Error(`Supabase ${res.status}: ${text.slice(0, 300)}`); e.status = res.status; throw e;
     }
     const data = await res.json();
-    return data[0];
+    return data[0] || null; // null = это письмо уже было записано
   }
 }
 
